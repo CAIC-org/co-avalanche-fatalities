@@ -256,6 +256,7 @@
 
   
   function niceLegend(maxVal) {
+
     if (!isFinite(maxVal) || maxVal <= 0) {
       return { domMin: 1, domMax: 5, breaks: [5] };
     }
@@ -275,28 +276,37 @@
 
     const niceMax = step * Math.ceil(maxVal / step);
 
-    const rawTicks = [];
-    for (let v = step; v <= niceMax; v += step) {
-      rawTicks.push(v);
-    }
+    const domMin = 1;
+    const domMax = niceMax;
 
-    let tickVals;
     const maxTicks = 4;
 
-    if (rawTicks.length <= maxTicks) {
-      tickVals = rawTicks;
-    } else {
-      tickVals = [];
-      const stride = (rawTicks.length - 1) / (maxTicks - 1);
-      for (let i = 0; i < maxTicks; i++) {
-        const idx = Math.round(i * stride);
-        tickVals.push(rawTicks[idx]);
+    if (niceMax <= 20) {
+      const ticksSmall = [5, 10, 15, 20].filter(v => v <= niceMax);
+      return { domMin, domMax, breaks: ticksSmall };
+    }
+
+    const minTick = 5;
+    const ticks = [];
+    ticks.push(minTick);
+
+    const span = niceMax - minTick;
+    const interiorCount = maxTicks - 2; // 2 interior ticks max
+
+    for (let i = 1; i <= interiorCount; i++) {
+      const target = minTick + (span * i) / (interiorCount + 1);
+      const snapped = step * Math.round(target / step);
+      if (snapped > minTick && snapped < niceMax && !ticks.includes(snapped)) {
+        ticks.push(snapped);
       }
     }
 
-  return { domMin: 1, domMax: niceMax, breaks: tickVals };
-}
+    ticks.push(niceMax);
 
+    const uniqueSorted = Array.from(new Set(ticks)).sort((a, b) => a - b);
+
+    return { domMin, domMax, breaks: uniqueSorted };
+  }
 
   function updateSubtitle(metric, year) {
     const sub = document.getElementById("subTitle");
