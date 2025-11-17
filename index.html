@@ -254,10 +254,12 @@
     return "value_year";
   }
 
+  
   function niceLegend(maxVal) {
     if (!isFinite(maxVal) || maxVal <= 0) {
       return { domMin: 1, domMax: 5, breaks: [5] };
     }
+
     let step;
     if (maxVal <= 20) {
       step = 5;
@@ -270,13 +272,31 @@
     } else {
       step = 100;
     }
+
     const niceMax = step * Math.ceil(maxVal / step);
-    const breaks = [];
+
+    const rawTicks = [];
     for (let v = step; v <= niceMax; v += step) {
-      breaks.push(v);
+      rawTicks.push(v);
     }
-    return { domMin: 1, domMax: niceMax, breaks };
-  }
+
+    let tickVals;
+    const maxTicks = 4;
+
+    if (rawTicks.length <= maxTicks) {
+      tickVals = rawTicks;
+    } else {
+      tickVals = [];
+      const stride = (rawTicks.length - 1) / (maxTicks - 1);
+      for (let i = 0; i < maxTicks; i++) {
+        const idx = Math.round(i * stride);
+        tickVals.push(rawTicks[idx]);
+      }
+    }
+
+  return { domMin: 1, domMax: niceMax, breaks: tickVals };
+}
+
 
   function updateSubtitle(metric, year) {
     const sub = document.getElementById("subTitle");
@@ -377,13 +397,9 @@
       const labelsDiv = container.querySelector(".legend-labels");
       labelsDiv.innerHTML = "";
 
-      let tickVals = ticks;
-      if (!tickVals || tickVals.length === 0) {
-        tickVals = [domMin, domMax];
-      }
-      if (tickVals.length > 4) tickVals = tickVals.slice(0, 4);
+      let tickVals = ticks && ticks.length ? ticks.slice() : [domMin, domMax];
 
-      tickVals.sort((a,b) => a - b);
+      tickVals.sort((a, b) => a - b);
 
       tickVals.forEach(v => {
         const span = document.createElement("span");
