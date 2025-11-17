@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Colorado Avalanche Fatalities</title>
+
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      width: 100%;
+    }
+
+    #header {
+      padding: 10px 16px 6px;
+      border-bottom: 1px solid #ddd;
+    }
+    #mainTitle {
+      font-size: 24px;
+      font-weight: 700;
+      margin: 0;
+    }
+    #subTitle {
+      font-size: 14px;
+      font-weight: 500;
+      color: #555;
+      margin-top: 2px;
+    }
+
+    #controls {
+      padding: 8px 16px;
+      border-bottom: 1px solid #ddd;
+      background: #f8f8f8;
+      font-size: 14px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+    }
+    #controls label {
+      font-weight: 500;
+      margin-right: 6px;
+    }
+    #yearSlider {
+      width: 260px;
+      vertical-align: middle;
+    }
+    button {
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid #bbb;
+      background: #ffffff;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    button:hover {
+      background: #e9e9e9;
+    }
+    select {
+      padding: 2px 4px;
+      font-size: 13px;
+    }
+
+    #map {
+      flex: 1;
+    }
+    #chartContainer {
+      height: 240px; 
+      padding: 4px 16px 8px;
+      background: #ffffff;
+      border-top: 1px solid #ddd;
+    }
+    #footer {
+      font-size: 11px;
+      color: #555;
+      padding: 4px 16px 8px;
+      border-top: 1px solid #ddd;
+      background: #fafafa;
+      line-height: 1.25;
+    }
+
+    .lblbox {
+      font-size: 11px;
+      font-weight: 600;
+      color: #222222;
+      background: rgba(250, 250, 250, 0.96);
+      border-radius: 4px;
+      border: 1px solid rgba(0, 0, 0, 0.25);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.30);
+      padding: 2px 4px;
+    }
+
+    .info {
+      padding: 6px 8px;
+      background: rgba(255, 255, 255, 0.95);
+      box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+      border-radius: 4px;
+      font-size: 12px;
+      line-height: 1.3;
+    }
+    .info b {
+      font-size: 13px;
+    }
+
+    .legend {
+      background: white;
+      padding: 6px 8px;
+      border-radius: 4px;
+      border: 1px solid rgba(0,0,0,0.3);
+      font-size: 11px;
+      line-height: 1.2;
+    }
+    .legend-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    .legend-scale {
+      display: flex;
+      align-items: stretch;
+    }
+    .legend-bar {
+      position: relative;
+      height: 140px;
+      width: 18px;
+      background: linear-gradient(to top, #08306B, #DEEBF7);
+      border: 1px solid #ccc;
+    }
+
+    .legend-bar::before,
+    .legend-bar::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      border-top: 1px solid rgba(0,0,0,0.25);
+    }
+    .legend-bar::before {
+      top: 25%;
+      box-shadow:
+        0 35px 0 rgba(0,0,0,0.25),
+        0 70px 0 rgba(0,0,0,0.25);
+    }
+    .legend-labels {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      margin-left: 6px;
+    }
+
+    #barChart {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+
+<body>
+<div id="app">
+  <div id="header">
+    <div id="mainTitle">Colorado Avalanche Fatalities</div>
+    <div id="subTitle"></div>
+  </div>
+
+  <div id="controls">
+    <div>
+      <label>
+        Avalanche Year:
+        <input type="range" id="yearSlider" min="1861" max="2025" value="1861" step="1" />
+      </label>
+      <span id="yearLabel">1861</span>
+    </div>
+
+    <div>
+      <button id="playBtn">Play</button>
+      <button id="pauseBtn">Pause</button>
+    </div>
+
+    <div>
+      <label>
+        Speed:
+        <select id="speedSelect">
+          <option value="0.5">0.5×</option>
+          <option value="1" selected>1×</option>
+          <option value="2">2×</option>
+        </select>
+      </label>
+    </div>
+
+    <div>
+      <label>
+        View:
+        <select id="metricSelect">
+          <option value="year">Avalanche Year (per-year fatalities)</option>
+          <option value="cum">Cumulative (up to year)</option>
+          <option value="roll10">Rolling 10-year</option>
+          <option value="roll50">Rolling 50-year</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div id="map"></div>
+
+  <div id="chartContainer">
+    <canvas id="barChart"></canvas>
+  </div>
+
+  <div id="footer">
+    Will, Robert G. Colorado Historical Counties. Data Set. Laura Rico-Beck and Emily Kelley, digital comps.
+    <em>Atlas of Historical County Boundaries</em>, ed. by John H. Long. Chicago: The Newberry Library, 2010.
+    Available online from http://www.newberry.org/ahcbp.<br/>
+    Historical avalanche fatality data compiled by the Colorado Avalanche Information Center (CAIC).
+  </div>
+</div>
+
+<script>
+  const YEAR_MIN = 1861;
+  const YEAR_MAX = 2025;
+
+  function colorRamp(value, minVal, maxVal) {
+    if (!isFinite(value) || value <= 0) return "#FAFAFA";  
+    if (maxVal <= minVal) maxVal = minVal + 1e-6;
+    const t = (value - minVal) / (maxVal - minVal);
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function hex(c) { c = Math.round(c); return ("0" + c.toString(16)).slice(-2); }
+    const c1 = {r: 0xDE, g: 0xEB, b: 0xF7};
+    const c2 = {r: 0x08, g: 0x30, b: 0x6B};
+    const r = lerp(c1.r, c2.r, t);
+    const g = lerp(c1.g, c2.g, t);
+    const b = lerp(c1.b, c2.b, t);
+    return "#" + hex(r) + hex(g) + hex(b);
+  }
+
+  function metricKey(metric) {
+    if (metric === "year")   return "value_year";
+    if (metric === "cum")    return "value_cum";
+    if (metric === "roll10") return "value_roll10";
+    if (metric === "roll50") return "value_roll50";
+    return "value_year";
+  }
+
+  function niceLegend(maxVal) {
+    if (!isFinite(maxVal) || maxVal <= 0) {
+      return { domMin: 1, domMax: 5, breaks: [5] };
+    }
+    let step;
+    if (maxVal <= 20) {
+      step = 5;
+    } else if (maxVal <= 50) {
+      step = 10;
+    } else if (maxVal <= 120) {
+      step = 20;
+    } else if (maxVal <= 250) {
+      step = 50;
+    } else {
+      step = 100;
+    }
+    const niceMax = step * Math.ceil(maxVal / step);
+    const breaks = [];
+    for (let v = step; v <= niceMax; v += step) {
+      breaks.push(v);
+    }
+    return { domMin: 1, domMax: niceMax, breaks };
+  }
+
+  function updateSubtitle(metric, year) {
+    const sub = document.getElementById("subTitle");
+    let text = "";
+    if (metric === "year") {
+      text = `Avalanche Year ${year}`;
+    } else if (metric === "cum") {
+      text = `Cumulative fatalities, ${YEAR_MIN}–${year}`;
+    } else if (metric === "roll10") {
+      const start = Math.max(YEAR_MIN, year - 9);
+      text = `Rolling 10-year fatalities, ${start}–${year}`;
+    } else if (metric === "roll50") {
+      const start = Math.max(YEAR_MIN, year - 49);
+      text = `Rolling 50-year fatalities, ${start}–${year}`;
+    }
+    sub.textContent = text;
+  }
+
+  async function init() {
+    const yearSlider = document.getElementById("yearSlider");
+    const yearLabel  = document.getElementById("yearLabel");
+    const playBtn    = document.getElementById("playBtn");
+    const pauseBtn   = document.getElementById("pauseBtn");
+    const speedSel   = document.getElementById("speedSelect");
+    const metricSel  = document.getElementById("metricSelect");
+
+    let currentYear = YEAR_MIN;
+    let metric = "year";
+    let intervalMs = 1000; 
+    let timer = null;
+
+    const res = await fetch("data/co_fatal_web.geojson");
+    const geojson = await res.json();
+
+    const byYear = {};
+    geojson.features.forEach(f => {
+      const y = f.properties.year;
+      if (!byYear[y]) byYear[y] = [];
+      byYear[y].push(f);
+    });
+
+    const years = [];
+    const series = {year: [], cum: [], roll10: [], roll50: []};
+    for (let y = YEAR_MIN; y <= YEAR_MAX; y++) {
+      years.push(y);
+      const feats = byYear[y] || [];
+      let sumYear = 0, sumCum = 0, sum10 = 0, sum50 = 0;
+      feats.forEach(f => {
+        const p = f.properties;
+        sumYear += p.value_year   || 0;
+        sumCum  += p.value_cum    || 0;
+        sum10   += p.value_roll10 || 0;
+        sum50   += p.value_roll50 || 0;
+      });
+      series.year.push(sumYear);
+      series.cum.push(sumCum);
+      series.roll10.push(sum10);
+      series.roll50.push(sum50);
+    }
+
+    const map = L.map("map").setView([39.0, -105.5], 7);
+    L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Terrain_Base/MapServer/tile/{z}/{y}/{x}",
+      { attribution: "Tiles © Esri — Source: USGS, Esri, TANA, DeLorme, NPS" }
+    ).addTo(map);
+
+    const info = L.control({position: "topright"});
+    info.onAdd = function() {
+      this._div = L.DomUtil.create("div", "info");
+      this._div.style.display = "none";
+      return this._div;
+    };
+    info.update = function(props, year, metricKey) {
+      if (!props) {
+        this._div.style.display = "none";
+      } else {
+        const v = props[metricKey] || 0;
+        this._div.style.display = "block";
+        this._div.innerHTML =
+          `<b>${props.name_chr}</b><br/>` +
+          `Avalanche Year: ${year}<br/>` +
+          `Number of Fatalities: ${v}`;
+      }
+    };
+    info.addTo(map);
+
+    const legend = L.control({position: "bottomleft"});
+    legend.onAdd = function() {
+      const div = L.DomUtil.create("div", "legend");
+      div.innerHTML = "<div class='legend-title'>Fatalities</div>";
+      div.innerHTML += "<div class='legend-scale'><div class='legend-bar'></div><div class='legend-labels'></div></div>";
+      return div;
+    };
+    legend.addTo(map);
+
+    function updateLegend(domMin, domMax, ticks) {
+      const container = legend.getContainer();
+      const labelsDiv = container.querySelector(".legend-labels");
+      labelsDiv.innerHTML = "";
+
+      let tickVals = ticks;
+      if (!tickVals || tickVals.length === 0) {
+        tickVals = [domMin, domMax];
+      }
+      if (tickVals.length > 4) tickVals = tickVals.slice(0, 4);
+
+      tickVals.sort((a,b) => a - b);
+
+      tickVals.forEach(v => {
+        const span = document.createElement("span");
+        span.textContent = v;
+        labelsDiv.appendChild(span);
+      });
+    }
+
+    const countyLayer = L.geoJSON(null).addTo(map);
+
+
+    const ctx = document.getElementById("barChart").getContext("2d");
+    const barChart = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: years,
+        datasets: [{
+          label: "Fatalities",
+          data: series.year,
+          backgroundColor: years.map(() => "rgba(8,48,107,0.45)"),  
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          title: {
+            display: true,
+            align: "start",
+            text: "Avalanche Year fatalities",
+            font: { size: 12, weight: "600" }
+          }
+        },
+        scales: {
+          x: {
+            ticks: {
+              autoSkip: true,
+              maxTicksLimit: 12
+            },
+            grid: {
+              display: true,
+              drawBorder: true,
+              color: "rgba(0,0,0,0.08)",
+              tickLength: 4   
+            }
+          },
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: "rgba(0,0,0,0.08)"
+            }
+          }
+        }
+      }
+    });
+
+    function chartTitle(metric, year) {
+      if (metric === "year") {
+        return `Avalanche Year Fatalities (${year})`;
+      } else if (metric === "cum") {
+        return `Cumulative Fatalities (${YEAR_MIN}–${year})`;
+      } else if (metric === "roll10") {
+        return "Rolling 10-year Fatalities";
+      } else if (metric === "roll50") {
+        return "Rolling 50-year Fatalities";
+      }
+      return "";
+    }
+
+    function updateChart() {
+      const data = series[metric];
+      barChart.data.datasets[0].data = data;
+
+      const colors = years.map(y => {
+        let active = false;
+        if (metric === "year") {
+          active = (y === currentYear);
+        } else if (metric === "cum") {
+          active = (y <= currentYear);
+        } else if (metric === "roll10") {
+          active = (y >= currentYear - 9 && y <= currentYear);
+        } else if (metric === "roll50") {
+          active = (y >= currentYear - 49 && y <= currentYear);
+        }
+
+        return active ? "rgba(8,48,107,0.65)" : "rgba(200,200,200,0.85)";
+      });
+
+      barChart.data.datasets[0].backgroundColor = colors;
+      barChart.options.plugins.title.text = chartTitle(metric, currentYear);
+      barChart.update("none");
+    }
+
+    function updateMap() {
+      const feats = byYear[currentYear] || [];
+      const key = metricKey(metric);
+
+      let domMin, domMax, ticks;
+      if (metric === "year") {
+        domMin = 1;
+        domMax = 25;
+        ticks  = [5, 10, 15, 20];
+      } else {
+        let maxVal = 0;
+        feats.forEach(f => {
+          const v = f.properties[key] || 0;
+          if (v > maxVal) maxVal = v;
+        });
+        if (maxVal < 1) maxVal = 1;
+        const leg = niceLegend(maxVal);
+        domMin = leg.domMin;
+        domMax = leg.domMax;
+        ticks  = leg.breaks;
+      }
+
+      countyLayer.clearLayers();
+      countyLayer.addData(feats).setStyle(f => {
+        const v = f.properties[key] || 0;
+        return {
+          weight: 1,
+          color: "#555555",
+          fillOpacity: 0.7,
+          fillColor: colorRamp(v, domMin, domMax)
+        };
+      }).eachLayer(layer => {
+        const v = layer.feature.properties[key] || 0;
+        if (v > 0) {
+          layer.bindTooltip(String(v), {
+            permanent: true,
+            direction: "center",
+            className: "lblbox"
+          });
+        }
+        layer.on("mouseover", e => {
+          info.update(e.target.feature.properties, currentYear, key);
+        });
+        layer.on("mouseout", () => {
+          info.update(null);
+        });
+      });
+
+      updateLegend(domMin, domMax, ticks);
+      updateChart();
+      yearLabel.textContent = currentYear;
+      updateSubtitle(metric, currentYear);
+    }
+
+    yearSlider.min = YEAR_MIN;
+    yearSlider.max = YEAR_MAX;
+    yearSlider.value = YEAR_MIN;
+
+    yearSlider.addEventListener("input", () => {
+      currentYear = parseInt(yearSlider.value, 10);
+      updateMap();
+    });
+
+    metricSel.addEventListener("change", () => {
+      metric = metricSel.value;
+      updateMap();
+    });
+
+    speedSel.addEventListener("change", () => {
+      const factor = parseFloat(speedSel.value); 
+      intervalMs = 1000 / factor;
+      if (timer) {
+        clearInterval(timer);
+        timer = setInterval(stepYear, intervalMs);
+      }
+    });
+
+    function stepYear() {
+      currentYear = (currentYear >= YEAR_MAX) ? YEAR_MIN : currentYear + 1;
+      yearSlider.value = currentYear;
+      updateMap();
+    }
+
+    playBtn.addEventListener("click", () => {
+      if (timer) return;
+      timer = setInterval(stepYear, intervalMs);
+    });
+
+    pauseBtn.addEventListener("click", () => {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    });
+
+    updateMap();
+  }
+
+  init();
+</script>
+</body>
+</html>
