@@ -254,11 +254,19 @@
     return "value_year";
   }
 
-  
-  function niceLegend(maxVal) {
+  function niceLegend(view, maxVal) {
+
+    if (view === "year") {
+
+      return {
+        domMin: 0,
+        domMax: 25,
+        breaks: [5, 10, 15, 20]
+      };
+    }
 
     if (!isFinite(maxVal) || maxVal <= 0) {
-      return { domMin: 1, domMax: 5, breaks: [5] };
+      return { domMin: 0, domMax: 5, breaks: [1, 3, 5] };
     }
 
     let step;
@@ -276,27 +284,19 @@
 
     const niceMax = step * Math.ceil(maxVal / step);
 
-    const domMin = 1;
+    const domMin = 0;
     const domMax = niceMax;
 
     const maxTicks = 4;
+    const firstTick = step;   
+    const ticks = [firstTick];
 
-    if (niceMax <= 20) {
-      const ticksSmall = [5, 10, 15, 20].filter(v => v <= niceMax);
-      return { domMin, domMax, breaks: ticksSmall };
-    }
-
-    const minTick = 5;
-    const ticks = [];
-    ticks.push(minTick);
-
-    const span = niceMax - minTick;
-    const interiorCount = maxTicks - 2; 
-
+    const span = niceMax - firstTick;
+    const interiorCount = maxTicks - 2;
     for (let i = 1; i <= interiorCount; i++) {
-      const target = minTick + (span * i) / (interiorCount + 1);
+      const target = firstTick + (span * i) / (interiorCount + 1);
       const snapped = step * Math.round(target / step);
-      if (snapped > minTick && snapped < niceMax && !ticks.includes(snapped)) {
+      if (snapped > firstTick && snapped < niceMax && !ticks.includes(snapped)) {
         ticks.push(snapped);
       }
     }
@@ -304,9 +304,11 @@
     ticks.push(niceMax);
 
     const uniqueSorted = Array.from(new Set(ticks)).sort((a, b) => a - b);
-
     return { domMin, domMax, breaks: uniqueSorted };
   }
+
+
+
 
   function updateSubtitle(metric, year) {
     const sub = document.getElementById("subTitle");
@@ -509,49 +511,47 @@
       const feats = byYear[currentYear] || [];
       const key = metricKey(metric);
 
-      let domMin, domMax, ticks;
-      if (metric === "year") {
-        domMin = 1;
-        domMax = 25;
-        ticks  = [5, 10, 15, 20];
-      } else {
-        let maxVal = 0;
-        feats.forEach(f => {
-          const v = f.properties[key] || 0;
-          if (v > maxVal) maxVal = v;
-        });
-        if (maxVal < 1) maxVal = 1;
-        const leg = niceLegend(maxVal);
-        domMin = leg.domMin;
-        domMax = leg.domMax;
-        ticks  = leg.breaks;
-      }
+      let maxVal = 0;
+      feats.forEach(f => {
+        const v = f.properties[key] || 0;
+        if (v > maxVal) maxVal = v;
+      });
+
+      const leg   = niceLegend(metric, maxVal);
+      const domMin = leg.domMin;
+      const domMax = leg.domMax;
+      const ticks  = leg.breaks;
 
       countyLayer.clearLayers();
-      countyLayer.addData(feats).setStyle(f => {
-        const v = f.properties[key] || 0;
-        return {
-          weight: 1,
-          color: "#555555",
-          fillOpacity: 0.7,
-          fillColor: colorRamp(v, domMin, domMax)
-        };
-      }).eachLayer(layer => {
-        const v = layer.feature.properties[key] || 0;
-        if (v > 0) {
-          layer.bindTooltip(String(v), {
-            permanent: true,
-            direction: "center",
-            className: "lblbox"
+      countyLayer
+        .addData(feats)
+        .setStyle(f => {
+          const v = f.properties[key] || 0;
+          return {
+            weight: 1,
+            color: "#555555",
+            fillOpacity: 0.7,
+            fillColor: colorRamp(v, domMin, domMax)
+          };
+        })
+        .eachLayer(layer => {
+          const v = layer.feature.properties[key] || 0;
+
+          if (v > 0) {
+            layer.bindTooltip(String(v), {
+              permanent: true,
+              direction: "center",
+              className: "lblbox"
+            });
+          }
+
+          layer.on("mouseover", e => {
+            info.update(e.target.feature.properties, currentYear, key);
           });
-        }
-        layer.on("mouseover", e => {
-          info.update(e.target.feature.properties, currentYear, key);
+          layer.on("mouseout", () => {
+            info.update(null);
+          });
         });
-        layer.on("mouseout", () => {
-          info.update(null);
-        });
-      });
 
       updateLegend(domMin, domMax, ticks);
       updateChart();
