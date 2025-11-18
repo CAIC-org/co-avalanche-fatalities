@@ -141,25 +141,31 @@
       border: 1px solid #ccc;
     }
 
-    .legend-bar::before,
-    .legend-bar::after {
+    .legend-bar::before {
       content: "";
       position: absolute;
       left: 0;
       right: 0;
+      top: 20%;
       border-top: 1px solid rgba(0,0,0,0.25);
-    }
-    .legend-bar::before {
-      top: 25%;
       box-shadow:
-        0 35px 0 rgba(0,0,0,0.25),
-        0 70px 0 rgba(0,0,0,0.25);
+        0 28px 0 rgba(0,0,0,0.25),
+        0 56px 0 rgba(0,0,0,0.25),
+        0 84px 0 rgba(0,0,0,0.25);
     }
+
     .legend-labels {
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       margin-left: 6px;
+    }
+    .legend-labels span {
+      line-height: 1.1;
+    }
+    .legend-labels .tick-major {
+      font-size: 11px;
+      font-weight: 600;
     }
 
     #barChart {
@@ -256,59 +262,29 @@
 
   function niceLegend(view, maxVal) {
 
-    if (view === "year") {
+    if (!isFinite(maxVal) || maxVal <= 0) {
+      maxVal = 1;
+    }
 
+    if (view === "year") {
       return {
-        domMin: 0,
-        domMax: 25,
-        breaks: [5, 10, 15, 20]
+        domMin: 1,
+        domMax: 25
       };
     }
 
-    if (!isFinite(maxVal) || maxVal <= 0) {
-      return { domMin: 0, domMax: 5, breaks: [1, 3, 5] };
-    }
-
     let step;
-    if (maxVal <= 20) {
+    if (maxVal <= 50) {
       step = 5;
-    } else if (maxVal <= 50) {
-      step = 10;
-    } else if (maxVal <= 120) {
-      step = 20;
-    } else if (maxVal <= 250) {
-      step = 50;
     } else {
-      step = 100;
+      step = 10;  
     }
 
-    const niceMax = step * Math.ceil(maxVal / step);
+    const domMin = 1;
+    const domMax = step * Math.ceil(maxVal / step);
 
-    const domMin = 0;
-    const domMax = niceMax;
-
-    const maxTicks = 4;
-    const firstTick = step;   
-    const ticks = [firstTick];
-
-    const span = niceMax - firstTick;
-    const interiorCount = maxTicks - 2;
-    for (let i = 1; i <= interiorCount; i++) {
-      const target = firstTick + (span * i) / (interiorCount + 1);
-      const snapped = step * Math.round(target / step);
-      if (snapped > firstTick && snapped < niceMax && !ticks.includes(snapped)) {
-        ticks.push(snapped);
-      }
-    }
-
-    ticks.push(niceMax);
-
-    const uniqueSorted = Array.from(new Set(ticks)).sort((a, b) => a - b);
-    return { domMin, domMax, breaks: uniqueSorted };
+    return { domMin, domMax };
   }
-
-
-
 
   function updateSubtitle(metric, year) {
     const sub = document.getElementById("subTitle");
@@ -404,24 +380,23 @@
     };
     legend.addTo(map);
 
-    function updateLegend(domMin, domMax, ticks) {
+    function updateLegend(domMin, domMax) {
       const container = legend.getContainer();
       const labelsDiv = container.querySelector(".legend-labels");
       labelsDiv.innerHTML = "";
 
-      let tickVals = ticks && ticks.length ? ticks.slice() : [domMin, domMax];
+      const minSpan = document.createElement("span");
+      minSpan.textContent = domMin;
+      minSpan.className = "tick-major";
+      labelsDiv.appendChild(minSpan);
 
-      tickVals.sort((a, b) => a - b);
-
-      tickVals.forEach(v => {
-        const span = document.createElement("span");
-        span.textContent = v;
-        labelsDiv.appendChild(span);
-      });
+      const maxSpan = document.createElement("span");
+      maxSpan.textContent = domMax;
+      maxSpan.className = "tick-major";
+      labelsDiv.appendChild(maxSpan);
     }
 
     const countyLayer = L.geoJSON(null).addTo(map);
-
 
     const ctx = document.getElementById("barChart").getContext("2d");
     const barChart = new Chart(ctx, {
@@ -520,7 +495,6 @@
       const leg   = niceLegend(metric, maxVal);
       const domMin = leg.domMin;
       const domMax = leg.domMax;
-      const ticks  = leg.breaks;
 
       countyLayer.clearLayers();
       countyLayer
@@ -553,7 +527,7 @@
           });
         });
 
-      updateLegend(domMin, domMax, ticks);
+      updateLegend(domMin, domMax);
       updateChart();
       yearLabel.textContent = currentYear;
       updateSubtitle(metric, currentYear);
