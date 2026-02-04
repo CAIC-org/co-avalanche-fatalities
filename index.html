@@ -357,7 +357,14 @@ Updated on: 11/18/2025
     let timer = null;
 
     const res = await fetch("data/co_fatal_web.geojson.gz");
-    const geojson = await res.json();
+    let geojson;
+    if (res.headers.get("Content-Encoding") === "gzip") {
+      geojson = await res.json();
+    } else {
+      const decompressed = res.body.pipeThrough(new DecompressionStream("gzip"));
+      const text = await new Response(decompressed).text();
+      geojson = JSON.parse(text);
+    }
 
     const byYear = {};
     geojson.features.forEach(f => {
