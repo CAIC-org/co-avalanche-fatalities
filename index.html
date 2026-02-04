@@ -356,7 +356,7 @@ Updated on: 11/18/2025
     let intervalMs = 1000; 
     let timer = null;
 
-    const res = await fetch("data/co_fatal_web.geojson");
+    const res = await fetch("data/co_fatal_web.geojson.gz");
     const geojson = await res.json();
 
     const byYear = {};
