@@ -2,7 +2,7 @@
 <!-- HTML Viewer for Historical Colorado Avalanche Fatality Data 
 Created by: Valerie Foley, valerie.foley@state.co.us
 Created on: 11/12/2025
-Updated on: 11/18/2025
+Updated on: 2/10/2026
 -->
 
 <html lang="en">
@@ -559,11 +559,19 @@ Updated on: 11/18/2025
           const v = layer.feature.properties[key] || 0;
 
           if (v > 0) {
+            const countyName = layer.feature.properties.name_chr;
+            let labelLatLng = layer.getBounds().getCenter();
+            
+            // Manual override for Boulder County (place label in main polygon)
+            if (countyName === "BOULDER") {
+              labelLatLng = L.latLng(40.1, -105.35);
+            }
+            
             layer.bindTooltip(String(v), {
               permanent: true,
               direction: "center",
               className: "lblbox"
-            });
+            }).openTooltip(labelLatLng);
           }
 
           layer.on("mouseover", e => {
